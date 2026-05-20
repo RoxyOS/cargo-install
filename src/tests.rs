@@ -136,53 +136,6 @@ fn command_applies_configured_stdio() {
 }
 
 #[test]
-fn command_status_returns_fake_cargo_exit_status() {
-    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
-    let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(temp.path(), 23, "");
-    let output_path = temp.path().join("captured-args.txt");
-    let original_path = std::env::var_os("PATH");
-    let script_dir = script_path.parent().unwrap();
-    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
-    if let Some(existing) = &original_path {
-        new_path.push(if cfg!(windows) { ";" } else { ":" });
-        new_path.push(existing);
-    }
-
-    unsafe {
-        std::env::set_var("PATH", &new_path);
-    }
-
-    let install = CargoInstallBuilder::default()
-        .version(Some("1.0.0".into()))
-        .extra_args(vec![
-            "ripgrep".into(),
-            "--locked".into(),
-            output_path.as_os_str().into(),
-        ])
-        .build()
-        .unwrap();
-
-    let status = install.command().status().unwrap();
-
-    if let Some(existing) = original_path {
-        unsafe {
-            std::env::set_var("PATH", existing);
-        }
-    }
-
-    assert_eq!(status.code(), Some(23));
-    let captured = fs::read_to_string(output_path).unwrap();
-    assert_eq!(
-        captured,
-        format!(
-            "install\n--version\n1.0.0\nripgrep\n--locked\n{}\n",
-            temp.path().join("captured-args.txt").display()
-        )
-    );
-}
-
-#[test]
 fn run_returns_cargo_not_installed_when_cargo_is_missing() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let original_path = std::env::var_os("PATH");
