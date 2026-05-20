@@ -27,7 +27,6 @@ pub struct CargoInstall {
     no_default_features: bool,
     extra_args: Vec<OsString>,
     stdout: Option<Stdio>,
-    stderr: Option<Stdio>,
 }
 
 impl CargoInstall {
@@ -54,11 +53,11 @@ impl CargoInstall {
         })
     }
 
-    pub fn command(mut self) -> Command {
+    fn command(mut self) -> Command {
         Command::new("cargo").tap_mut(|command| {
             command.args(self.args());
             command.stdout(self.stdout.take().unwrap_or_else(Stdio::inherit));
-            command.stderr(self.stderr.take().unwrap_or_else(Stdio::inherit));
+            command.stderr(Stdio::piped());
         })
     }
 
