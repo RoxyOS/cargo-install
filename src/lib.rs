@@ -1,9 +1,12 @@
+mod error;
 mod utils;
+
+pub use crate::error::CargoInstallError;
 
 use crate::utils::{push_flag, push_joined, push_option};
 use derive_builder::Builder;
 use std::ffi::OsString;
-use std::process::{Command, ExitStatus};
+use std::process::{Command, Stdio};
 use tap::Tap;
 
 #[derive(Builder, Clone, Debug, Default)]
@@ -55,8 +58,22 @@ impl CargoInstall {
         })
     }
 
-    pub fn run(&self) -> std::io::Result<ExitStatus> {
-        self.command().status()
+    pub fn run(&self) -> Result<(), CargoInstallError> {
+        let mut command = self.command();
+        command.stdout(Stdio::inherit());
+        command.stderr(Stdio::piped());
+
+        let output = command
+            .spawn()
+            .map_err(CargoInstallError::from_spawn_error)?
+            .wait_with_output()?;
+        let status = output.status;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(CargoInstallError::from_output(status, output.stderr))
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::CargoInstallBuilder;
+use crate::{CargoInstallBuilder, CargoInstallError};
 use std::ffi::OsStr;
 use std::fs;
 #[cfg(unix)]
@@ -119,10 +119,10 @@ fn raw_args_are_appended_after_typed_options() {
 }
 
 #[test]
-fn execution_uses_fake_cargo_and_preserves_exit_status() {
-    let _guard = env_lock().lock().unwrap();
+fn command_status_returns_fake_cargo_exit_status() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(temp.path());
+    let script_path = fake_cargo_script(temp.path(), 23, "");
     let output_path = temp.path().join("captured-args.txt");
     let original_path = std::env::var_os("PATH");
     let script_dir = script_path.parent().unwrap();
@@ -146,7 +146,7 @@ fn execution_uses_fake_cargo_and_preserves_exit_status() {
         .build()
         .unwrap();
 
-    let status = install.run().unwrap();
+    let status = install.command().status().unwrap();
 
     if let Some(existing) = original_path {
         unsafe {
@@ -166,8 +166,8 @@ fn execution_uses_fake_cargo_and_preserves_exit_status() {
 }
 
 #[test]
-fn missing_program_returns_io_error() {
-    let _guard = env_lock().lock().unwrap();
+fn run_returns_io_error_when_cargo_is_missing() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let original_path = std::env::var_os("PATH");
 
     unsafe {
@@ -183,14 +183,21 @@ fn missing_program_returns_io_error() {
         }
     }
 
-    assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    assert!(matches!(
+        error,
+        CargoInstallError::CargoNotInstalled
+    ));
 }
 
 #[test]
-fn free_function_forwards_raw_args() {
-    let _guard = env_lock().lock().unwrap();
+fn run_returns_non_zero_exit_error() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(temp.path());
+    let script_path = fake_cargo_script(
+        temp.path(),
+        23,
+        "error: failed to compile `ripgrep v14.1.1`, intermediate artifacts can be found at `/tmp/cargo-installabc`\n",
+    );
     let output_path = temp.path().join("captured-args.txt");
 
     let original_path = std::env::var_os("PATH");
@@ -205,7 +212,7 @@ fn free_function_forwards_raw_args() {
         std::env::set_var("PATH", &new_path);
     }
 
-    let status = CargoInstallBuilder::default()
+    let error = CargoInstallBuilder::default()
         .extra_args(vec![
             "ripgrep".into(),
             "--locked".into(),
@@ -214,7 +221,7 @@ fn free_function_forwards_raw_args() {
         .build()
         .unwrap()
         .run()
-        .unwrap();
+        .unwrap_err();
 
     if let Some(existing) = original_path {
         unsafe {
@@ -222,7 +229,10 @@ fn free_function_forwards_raw_args() {
         }
     }
 
-    assert_eq!(status.code(), Some(23));
+    assert!(matches!(
+        error,
+        CargoInstallError::CompileFailed { ref package, .. } if package == "ripgrep v14.1.1"
+    ));
     let captured = fs::read_to_string(output_path).unwrap();
     assert_eq!(
         captured,
@@ -233,17 +243,158 @@ fn free_function_forwards_raw_args() {
     );
 }
 
+#[test]
+fn run_succeeds_on_zero_exit_status() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
+    let temp = tempdir().unwrap();
+    let script_path = fake_cargo_script(temp.path(), 0, "");
+    let output_path = temp.path().join("captured-args.txt");
+    let original_path = std::env::var_os("PATH");
+    let script_dir = script_path.parent().unwrap();
+    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
+    if let Some(existing) = &original_path {
+        new_path.push(if cfg!(windows) { ";" } else { ":" });
+        new_path.push(existing);
+    }
+
+    unsafe {
+        std::env::set_var("PATH", &new_path);
+    }
+
+    let result = CargoInstallBuilder::default()
+        .extra_args(vec!["ripgrep".into(), output_path.as_os_str().into()])
+        .build()
+        .unwrap()
+        .run();
+
+    if let Some(existing) = original_path {
+        unsafe {
+            std::env::set_var("PATH", existing);
+        }
+    }
+
+    assert!(result.is_ok());
+    let captured = fs::read_to_string(output_path).unwrap();
+    assert_eq!(
+        captured,
+        format!("install\nripgrep\n{}\n", temp.path().join("captured-args.txt").display())
+    );
+}
+
+#[test]
+fn run_parses_already_installed_error() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
+    let temp = tempdir().unwrap();
+    let script_path = fake_cargo_script(
+        temp.path(),
+        101,
+        "Ignored package `ripgrep v14.1.1` is already installed, use --force to override\n",
+    );
+    let original_path = std::env::var_os("PATH");
+    let script_dir = script_path.parent().unwrap();
+    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
+    if let Some(existing) = &original_path {
+        new_path.push(if cfg!(windows) { ";" } else { ":" });
+        new_path.push(existing);
+    }
+
+    unsafe {
+        std::env::set_var("PATH", &new_path);
+    }
+
+    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+
+    if let Some(existing) = original_path {
+        unsafe {
+            std::env::set_var("PATH", existing);
+        }
+    }
+
+    assert!(matches!(
+        error,
+        CargoInstallError::AlreadyInstalled { ref package, .. } if package == "ripgrep v14.1.1"
+    ));
+}
+
+#[test]
+fn run_parses_binary_already_exists_error() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
+    let temp = tempdir().unwrap();
+    let script_path = fake_cargo_script(
+        temp.path(),
+        101,
+        "error: binary `cargo-embed` already exists in destination as part of `probe-rs-tools v0.24.0`\nAdd --force to overwrite\n",
+    );
+    let original_path = std::env::var_os("PATH");
+    let script_dir = script_path.parent().unwrap();
+    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
+    if let Some(existing) = &original_path {
+        new_path.push(if cfg!(windows) { ";" } else { ":" });
+        new_path.push(existing);
+    }
+
+    unsafe {
+        std::env::set_var("PATH", &new_path);
+    }
+
+    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+
+    if let Some(existing) = original_path {
+        unsafe {
+            std::env::set_var("PATH", existing);
+        }
+    }
+
+    assert!(matches!(
+        error,
+        CargoInstallError::BinaryAlreadyExists { ref binary, .. } if binary == "cargo-embed"
+    ));
+}
+
+#[test]
+fn run_falls_back_to_generic_cargo_failure() {
+    let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
+    let temp = tempdir().unwrap();
+    let script_path = fake_cargo_script(temp.path(), 55, "error: something unrecognized happened\n");
+    let original_path = std::env::var_os("PATH");
+    let script_dir = script_path.parent().unwrap();
+    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
+    if let Some(existing) = &original_path {
+        new_path.push(if cfg!(windows) { ";" } else { ":" });
+        new_path.push(existing);
+    }
+
+    unsafe {
+        std::env::set_var("PATH", &new_path);
+    }
+
+    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+
+    if let Some(existing) = original_path {
+        unsafe {
+            std::env::set_var("PATH", existing);
+        }
+    }
+
+    assert!(matches!(
+        error,
+        CargoInstallError::UnknownCargoError { status, ref stderr }
+            if status.code() == Some(55) && stderr == "error: something unrecognized happened"
+    ));
+}
+
 fn env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
 #[cfg(unix)]
-fn fake_cargo_script(dir: &Path) -> PathBuf {
+fn fake_cargo_script(dir: &Path, exit_code: i32, stderr: &str) -> PathBuf {
     let script_path = dir.join("cargo");
     fs::write(
         &script_path,
-        r#"#!/bin/sh
+        format!(
+            r#"#!/bin/sh
 output=""
 for arg in "$@"; do
     if [ "$output" = "" ]; then
@@ -258,8 +409,12 @@ for arg in "$@"; do
     last="$arg"
 done
 printf '%s\n' "$output" > "$last"
-exit 23
+cat >&2 <<'EOF'
+{stderr}EOF
+exit {exit_code}
 "#,
+            stderr = stderr,
+        ),
     )
     .unwrap();
 

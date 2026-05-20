@@ -40,3 +40,18 @@ pub(crate) fn join_os_strings(parts: &[OsString], separator: &str) -> OsString {
 
     joined
 }
+
+pub(crate) fn extract_backticked_before(input: &str, marker: &str) -> Option<String> {
+    let marker_index = input.find(marker)?;
+    let prefix = &input[..marker_index];
+    let end_tick = prefix.rfind('`')?;
+    let start_tick = prefix[..end_tick].rfind('`')?;
+    Some(prefix[start_tick + 1..end_tick].to_owned())
+}
+
+pub(crate) fn extract_backticked_after(input: &str, prefix: &str) -> Option<String> {
+    let start = input.find(prefix)? + prefix.len();
+    let rest = &input[start..];
+    let end = rest.find('`')?;
+    Some(rest[..end].to_owned())
+}
