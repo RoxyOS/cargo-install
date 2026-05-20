@@ -1,0 +1,12 @@
+[package]
+name = "cargo-install"
+version = "0.1.0"
+edition = "2024"
+description = "Wrapper for the cargo install command"
+
+[dependencies]
+derive_builder = "0.20"
+tap = "1"
+
+[dev-dependencies]
+tempfile = "3"
