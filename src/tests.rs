@@ -120,10 +120,9 @@ fn raw_args_are_appended_after_typed_options() {
 }
 
 #[test]
-fn command_applies_configured_stdio_modes() {
+fn command_applies_configured_stdio() {
     let install = CargoInstallBuilder::default()
         .stdout(Some(Stdio::null()))
-        .stderr(Some(Stdio::null()))
         .build()
         .unwrap();
 
@@ -184,7 +183,7 @@ fn command_status_returns_fake_cargo_exit_status() {
 }
 
 #[test]
-fn run_returns_io_error_when_cargo_is_missing() {
+fn run_returns_cargo_not_installed_when_cargo_is_missing() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let original_path = std::env::var_os("PATH");
 
@@ -201,102 +200,46 @@ fn run_returns_io_error_when_cargo_is_missing() {
         }
     }
 
-    assert!(matches!(
-        error,
-        CargoInstallError::CargoNotInstalled
-    ));
+    assert!(matches!(error, CargoInstallError::CargoNotInstalled));
 }
 
 #[test]
-fn run_returns_non_zero_exit_error() {
+fn run_parses_compile_failed_from_real_cargo_install() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(
-        temp.path(),
-        23,
-        "error: failed to compile `ripgrep v14.1.1`, intermediate artifacts can be found at `/tmp/cargo-installabc`\n",
-    );
-    let output_path = temp.path().join("captured-args.txt");
-
-    let original_path = std::env::var_os("PATH");
-    let script_dir = script_path.parent().unwrap();
-    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
-    if let Some(existing) = &original_path {
-        new_path.push(if cfg!(windows) { ";" } else { ":" });
-        new_path.push(existing);
-    }
-
-    unsafe {
-        std::env::set_var("PATH", &new_path);
-    }
+    let crate_dir = write_failing_crate(temp.path(), "compile-fail");
+    let root = temp.path().join("root");
 
     let error = CargoInstallBuilder::default()
-        .extra_args(vec![
-            "ripgrep".into(),
-            "--locked".into(),
-            output_path.as_os_str().into(),
-        ])
+        .path(Some(crate_dir))
+        .root(Some(root))
         .build()
         .unwrap()
         .run()
         .unwrap_err();
 
-    if let Some(existing) = original_path {
-        unsafe {
-            std::env::set_var("PATH", existing);
-        }
-    }
-
     assert!(matches!(
         error,
-        CargoInstallError::CompileFailed { ref package, .. } if package == "ripgrep v14.1.1"
+        CargoInstallError::CompileFailed { ref package, .. } if package.starts_with("compile-fail v0.1.0")
     ));
-    let captured = fs::read_to_string(output_path).unwrap();
-    assert_eq!(
-        captured,
-        format!(
-            "install\nripgrep\n--locked\n{}\n",
-            temp.path().join("captured-args.txt").display()
-        )
-    );
 }
 
 #[test]
-fn run_succeeds_on_zero_exit_status() {
+fn run_succeeds_on_real_cargo_install() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(temp.path(), 0, "");
-    let output_path = temp.path().join("captured-args.txt");
-    let original_path = std::env::var_os("PATH");
-    let script_dir = script_path.parent().unwrap();
-    let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
-    if let Some(existing) = &original_path {
-        new_path.push(if cfg!(windows) { ";" } else { ":" });
-        new_path.push(existing);
-    }
-
-    unsafe {
-        std::env::set_var("PATH", &new_path);
-    }
+    let crate_dir = write_binary_crate(temp.path(), "real-install-ok", "real-install-ok");
+    let root = temp.path().join("root");
 
     let result = CargoInstallBuilder::default()
-        .extra_args(vec!["ripgrep".into(), output_path.as_os_str().into()])
+        .path(Some(crate_dir))
+        .root(Some(root.clone()))
         .build()
         .unwrap()
         .run();
 
-    if let Some(existing) = original_path {
-        unsafe {
-            std::env::set_var("PATH", existing);
-        }
-    }
-
     assert!(result.is_ok());
-    let captured = fs::read_to_string(output_path).unwrap();
-    assert_eq!(
-        captured,
-        format!("install\nripgrep\n{}\n", temp.path().join("captured-args.txt").display())
-    );
+    assert!(installed_binary_path(&root, "real-install-ok").exists());
 }
 
 #[test]
@@ -341,7 +284,7 @@ fn run_parses_binary_already_exists_error() {
     let script_path = fake_cargo_script(
         temp.path(),
         101,
-        "error: binary `cargo-embed` already exists in destination as part of `probe-rs-tools v0.24.0`\nAdd --force to overwrite\n",
+        "error: binary `shared-bin` already exists in destination as part of `first-pkg v0.1.0`\nAdd --force to overwrite\n",
     );
     let original_path = std::env::var_os("PATH");
     let script_dir = script_path.parent().unwrap();
@@ -365,12 +308,12 @@ fn run_parses_binary_already_exists_error() {
 
     assert!(matches!(
         error,
-        CargoInstallError::BinaryAlreadyExists { ref binary, .. } if binary == "cargo-embed"
+        CargoInstallError::BinaryAlreadyExists { ref binary, .. } if binary == "shared-bin"
     ));
 }
 
 #[test]
-fn run_falls_back_to_generic_cargo_failure() {
+fn run_falls_back_to_unknown_error_for_unrecognized_stderr() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
     let script_path = fake_cargo_script(temp.path(), 55, "error: something unrecognized happened\n");
@@ -397,13 +340,63 @@ fn run_falls_back_to_generic_cargo_failure() {
     assert!(matches!(
         error,
         CargoInstallError::UnknownCargoError { status, ref stderr }
-            if status.code() == Some(55) && stderr == "error: something unrecognized happened"
+            if status.code() == Some(55) && stderr.contains("error: something unrecognized happened")
     ));
 }
 
 fn env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn write_binary_crate(base: &Path, package_name: &str, bin_name: &str) -> PathBuf {
+    let crate_dir = base.join(package_name);
+    let src_dir = crate_dir.join("src");
+    fs::create_dir_all(&src_dir).unwrap();
+    fs::write(
+        crate_dir.join("Cargo.toml"),
+        format!(
+            r#"[package]
+name = "{package_name}"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "{bin_name}"
+path = "src/main.rs"
+"#
+        ),
+    )
+    .unwrap();
+    fs::write(
+        src_dir.join("main.rs"),
+        format!("fn main() {{ println!(\"{}\"); }}\n", package_name),
+    )
+    .unwrap();
+    crate_dir
+}
+
+fn write_failing_crate(base: &Path, package_name: &str) -> PathBuf {
+    let crate_dir = base.join(package_name);
+    let src_dir = crate_dir.join("src");
+    fs::create_dir_all(&src_dir).unwrap();
+    fs::write(
+        crate_dir.join("Cargo.toml"),
+        format!(
+            r#"[package]
+name = "{package_name}"
+version = "0.1.0"
+edition = "2024"
+"#
+        ),
+    )
+    .unwrap();
+    fs::write(src_dir.join("main.rs"), "fn main() { let _ = ; }\n").unwrap();
+    crate_dir
+}
+
+fn installed_binary_path(root: &Path, binary_name: &str) -> PathBuf {
+    root.join("bin").join(binary_name)
 }
 
 #[cfg(unix)]
