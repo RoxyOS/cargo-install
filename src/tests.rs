@@ -4,6 +4,7 @@ use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::{Mutex, OnceLock};
 use tempfile::tempdir;
 
@@ -115,6 +116,23 @@ fn raw_args_are_appended_after_typed_options() {
             OsStr::new("--force"),
             OsStr::new("--quiet"),
         ]
+    );
+}
+
+#[test]
+fn command_applies_configured_stdio_modes() {
+    let install = CargoInstallBuilder::default()
+        .stdout(Some(Stdio::null()))
+        .stderr(Some(Stdio::null()))
+        .build()
+        .unwrap();
+
+    let command = install.command();
+
+    assert_eq!(command.get_program(), OsStr::new("cargo"));
+    assert_eq!(
+        command.get_args().collect::<Vec<_>>(),
+        vec![OsStr::new("install")]
     );
 }
 

@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::process::{Command, Stdio};
 use tap::Tap;
 
-#[derive(Builder, Clone, Debug, Default)]
+#[derive(Builder, Debug, Default)]
 #[builder(pattern = "owned", default)]
 pub struct CargoInstall {
     root: Option<std::path::PathBuf>,
@@ -26,6 +26,8 @@ pub struct CargoInstall {
     all_features: bool,
     no_default_features: bool,
     extra_args: Vec<OsString>,
+    stdout: Option<Stdio>,
+    stderr: Option<Stdio>,
 }
 
 impl CargoInstall {
@@ -52,18 +54,17 @@ impl CargoInstall {
         })
     }
 
-    pub fn command(&self) -> Command {
+    pub fn command(mut self) -> Command {
         Command::new("cargo").tap_mut(|command| {
             command.args(self.args());
+            command.stdout(self.stdout.take().unwrap_or_else(Stdio::inherit));
+            command.stderr(self.stderr.take().unwrap_or_else(Stdio::inherit));
         })
     }
 
-    pub fn run(&self) -> Result<(), CargoInstallError> {
-        let mut command = self.command();
-        command.stdout(Stdio::inherit());
-        command.stderr(Stdio::piped());
-
-        let output = command
+    pub fn run(self) -> Result<(), CargoInstallError> {
+        let output = self
+            .command()
             .spawn()
             .map_err(CargoInstallError::from_spawn_error)?
             .wait_with_output()?;
