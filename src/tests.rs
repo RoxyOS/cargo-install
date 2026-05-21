@@ -54,6 +54,8 @@ fn typed_flags_render_in_canonical_order() {
         .tag("v1.2.3")
         .rev("abc123")
         .target("x86_64-unknown-linux-gnu")
+        .bin("example-bin")
+        .profile("release")
         .path("vendor/pkg")
         .force(true)
         .locked(true)
@@ -85,6 +87,10 @@ fn typed_flags_render_in_canonical_order() {
             OsStr::new("abc123"),
             OsStr::new("--target"),
             OsStr::new("x86_64-unknown-linux-gnu"),
+            OsStr::new("--bin"),
+            OsStr::new("example-bin"),
+            OsStr::new("--profile"),
+            OsStr::new("release"),
             OsStr::new("--path"),
             OsStr::new("vendor/pkg"),
             OsStr::new("--force"),
@@ -220,7 +226,11 @@ fn run_parses_already_installed_error() {
         std::env::set_var("PATH", &new_path);
     }
 
-    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+    let error = CargoInstallBuilder::default()
+        .build()
+        .unwrap()
+        .run()
+        .unwrap_err();
 
     if let Some(existing) = original_path {
         unsafe {
@@ -255,7 +265,11 @@ fn run_parses_binary_already_exists_error() {
         std::env::set_var("PATH", &new_path);
     }
 
-    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+    let error = CargoInstallBuilder::default()
+        .build()
+        .unwrap()
+        .run()
+        .unwrap_err();
 
     if let Some(existing) = original_path {
         unsafe {
@@ -273,7 +287,8 @@ fn run_parses_binary_already_exists_error() {
 fn run_falls_back_to_unknown_error_for_unrecognized_stderr() {
     let _guard = env_lock().lock().unwrap_or_else(|err| err.into_inner());
     let temp = tempdir().unwrap();
-    let script_path = fake_cargo_script(temp.path(), 55, "error: something unrecognized happened\n");
+    let script_path =
+        fake_cargo_script(temp.path(), 55, "error: something unrecognized happened\n");
     let original_path = std::env::var_os("PATH");
     let script_dir = script_path.parent().unwrap();
     let mut new_path = std::ffi::OsString::from(script_dir.as_os_str());
@@ -286,7 +301,11 @@ fn run_falls_back_to_unknown_error_for_unrecognized_stderr() {
         std::env::set_var("PATH", &new_path);
     }
 
-    let error = CargoInstallBuilder::default().build().unwrap().run().unwrap_err();
+    let error = CargoInstallBuilder::default()
+        .build()
+        .unwrap()
+        .run()
+        .unwrap_err();
 
     if let Some(existing) = original_path {
         unsafe {

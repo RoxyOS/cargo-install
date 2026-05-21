@@ -12,6 +12,8 @@
 //!     CargoInstallBuilder::default()
 //!         .crate_name("ripgrep")
 //!         .version("14.1.1")
+//!         .bin("rg")
+//!         .profile("release")
 //!         .locked(true)
 //!         .build()?
 //!         .run()?;
@@ -52,6 +54,10 @@ pub struct CargoInstall {
     rev: Option<OsString>,
     /// Sets `--target` to build for a specific compilation target.
     target: Option<OsString>,
+    /// Sets `--bin` to install a specific binary target.
+    bin: Option<OsString>,
+    /// Sets `--profile` to select the build profile used for installation.
+    profile: Option<OsString>,
     /// Sets `--path` to install from a local crate directory.
     path: Option<std::path::PathBuf>,
     /// Sets the registry crate name to install.
@@ -95,6 +101,8 @@ impl CargoInstall {
             push_option(args, "--tag", self.tag.as_deref());
             push_option(args, "--rev", self.rev.as_deref());
             push_option(args, "--target", self.target.as_deref());
+            push_option(args, "--bin", self.bin.as_deref());
+            push_option(args, "--profile", self.profile.as_deref());
             push_option(args, "--path", self.path.as_deref());
             push_flag(args, "--force", self.force);
             push_flag(args, "--locked", self.locked);
