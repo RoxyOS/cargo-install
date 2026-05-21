@@ -23,8 +23,8 @@ fn empty_builder_produces_cargo_install() {
 #[test]
 fn derived_builder_constructs_install() {
     let install = CargoInstallBuilder::default()
-        .crate_name(Some("ripgrep".into()))
-        .version(Some("1.2.3".into()))
+        .crate_name("ripgrep")
+        .version("1.2.3")
         .force(true)
         .build()
         .unwrap();
@@ -47,14 +47,14 @@ fn derived_builder_constructs_install() {
 #[test]
 fn typed_flags_render_in_canonical_order() {
     let install = CargoInstallBuilder::default()
-        .root(Some("/tmp/root".into()))
-        .version(Some("1.2.3".into()))
-        .git(Some("https://example.com/repo.git".into()))
-        .branch(Some("stable".into()))
-        .tag(Some("v1.2.3".into()))
-        .rev(Some("abc123".into()))
-        .target(Some("x86_64-unknown-linux-gnu".into()))
-        .path(Some("vendor/pkg".into()))
+        .root("/tmp/root")
+        .version("1.2.3")
+        .git("https://example.com/repo.git")
+        .branch("stable")
+        .tag("v1.2.3")
+        .rev("abc123")
+        .target("x86_64-unknown-linux-gnu")
+        .path("vendor/pkg")
         .force(true)
         .locked(true)
         .debug(true)
@@ -101,8 +101,8 @@ fn typed_flags_render_in_canonical_order() {
 #[test]
 fn raw_args_are_appended_after_typed_options() {
     let install = CargoInstallBuilder::default()
-        .crate_name(Some("ripgrep".into()))
-        .version(Some("1.0.0".into()))
+        .crate_name("ripgrep")
+        .version("1.0.0")
         .extra_args(vec!["--force".into(), "--quiet".into()])
         .build()
         .unwrap();
@@ -126,7 +126,7 @@ fn raw_args_are_appended_after_typed_options() {
 #[test]
 fn command_applies_configured_stdio() {
     let install = CargoInstallBuilder::default()
-        .stdout(Some(Stdio::null()))
+        .stdout(Stdio::null())
         .build()
         .unwrap();
 
@@ -168,8 +168,8 @@ fn run_parses_compile_failed_from_real_cargo_install() {
     let root = temp.path().join("root");
 
     let error = CargoInstallBuilder::default()
-        .path(Some(crate_dir))
-        .root(Some(root))
+        .path(crate_dir)
+        .root(root)
         .build()
         .unwrap()
         .run()
@@ -189,8 +189,8 @@ fn run_succeeds_on_real_cargo_install() {
     let root = temp.path().join("root");
 
     let result = CargoInstallBuilder::default()
-        .path(Some(crate_dir))
-        .root(Some(root.clone()))
+        .path(crate_dir)
+        .root(root.clone())
         .build()
         .unwrap()
         .run();
