@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2024"
 description = "Wrapper around the cargo install command"
 readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/RoxyOS/cargo-install"
+homepage = "https://github.com/RoxyOS/cargo-install"
+documentation = "https://docs.rs/cargo-install"
+keywords = ["cargo", "install", "wrapper", "builder"]
+categories = ["development-tools::cargo-plugins", "api-bindings"]
 
 [dependencies]
 derive_builder = "0.20"
