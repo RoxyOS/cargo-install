@@ -2,7 +2,8 @@
 name = "cargo-install"
 version = "0.1.0"
 edition = "2024"
-description = "Wrapper for the cargo install command"
+description = "Wrapper around the cargo install command"
+readme = "README.md"
 
 [dependencies]
 derive_builder = "0.20"

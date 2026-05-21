@@ -1,3 +1,25 @@
+//! Wrapper around the `cargo install` command.
+//!
+//! The crate exposes a builder for the most common `cargo install`
+//! options, plus `extra_args` for unsupported flags.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use cargo_install::CargoInstallBuilder;
+//!
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     CargoInstallBuilder::default()
+//!         .version(Some("14.1.1".into()))
+//!         .locked(true)
+//!         .extra_args(vec!["ripgrep".into()])
+//!         .build()?
+//!         .run()?;
+//!
+//!     Ok(())
+//! }
+//! ```
+
 mod error;
 mod utils;
 
@@ -11,30 +33,57 @@ use tap::Tap;
 
 #[derive(Builder, Debug, Default)]
 #[builder(pattern = "owned", default)]
+/// Configuration for a `cargo install` invocation.
+///
+/// Construct this type directly with [`CargoInstall::new`] or prefer the
+/// generated `CargoInstallBuilder` for a more ergonomic setup flow.
 pub struct CargoInstall {
+    /// Sets `--root` to override the installation root directory.
     root: Option<std::path::PathBuf>,
+    /// Sets `--version` to install a specific crate version requirement.
     version: Option<OsString>,
+    /// Sets `--git` to install from a git repository.
     git: Option<OsString>,
+    /// Sets `--branch` when installing from git.
     branch: Option<OsString>,
+    /// Sets `--tag` when installing from git.
     tag: Option<OsString>,
+    /// Sets `--rev` when installing from git.
     rev: Option<OsString>,
+    /// Sets `--target` to build for a specific compilation target.
     target: Option<OsString>,
+    /// Sets `--path` to install from a local crate directory.
     path: Option<std::path::PathBuf>,
+    /// Enables `--force`.
     force: bool,
+    /// Enables `--locked`.
     locked: bool,
+    /// Enables `--debug`.
     debug: bool,
+    /// Sets `--features` using a feature list.
     features: Vec<OsString>,
+    /// Enables `--all-features`.
     all_features: bool,
+    /// Enables `--no-default-features`.
     no_default_features: bool,
+    /// Appends additional arguments after all typed options.
     extra_args: Vec<OsString>,
+    /// Overrides the child process stdout configuration.
+    ///
+    /// When not set, stdout inherits from the current process.
     stdout: Option<Stdio>,
 }
 
 impl CargoInstall {
+    /// Creates an empty `CargoInstall` configuration.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Builds the `cargo install` argument vector in canonical flag order.
+    ///
+    /// The returned list always starts with `install`, followed by typed
+    /// options and flags, followed by `extra_args`.
     pub fn args(&self) -> Vec<OsString> {
         vec![OsString::from("install")].tap_mut(|args| {
             push_option(args, "--root", self.root.as_deref());
@@ -63,6 +112,15 @@ impl CargoInstall {
         })
     }
 
+    /// Executes `cargo install` and maps common stderr patterns into
+    /// [`CargoInstallError`].
+    ///
+    /// `stdout` inherits from the current process unless overridden.
+    /// `stderr` is always captured so the crate can parse known failure modes.
+    ///
+    /// Error classification depends on the stderr text produced by the local
+    /// cargo version, so unrecognized messages fall back to
+    /// [`CargoInstallError::UnknownCargoError`].
     pub fn run(self) -> Result<(), CargoInstallError> {
         let output = self
             .command()
