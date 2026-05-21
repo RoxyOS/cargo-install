@@ -372,7 +372,11 @@ last=""
 for arg in "$@"; do
     last="$arg"
 done
-printf '%s\n' "$output" > "$last"
+case "$last" in
+    /*)
+        printf '%s\n' "$output" > "$last"
+        ;;
+esac
 cat >&2 <<'EOF'
 {stderr}EOF
 exit {exit_code}
