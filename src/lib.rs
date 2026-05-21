@@ -32,38 +32,29 @@ use std::process::{Command, Stdio};
 use tap::Tap;
 
 #[derive(Builder, Debug, Default)]
-#[builder(pattern = "owned", default)]
+#[builder(pattern = "owned", default, setter(into, strip_option))]
 /// Configuration for a `cargo install` invocation.
 ///
 /// Construct this type directly with [`CargoInstall::new`] or prefer the
 /// generated `CargoInstallBuilder` for a more ergonomic setup flow.
 pub struct CargoInstall {
     /// Sets `--root` to override the installation root directory.
-    #[builder(setter(into, strip_option), default)]
     root: Option<std::path::PathBuf>,
     /// Sets `--version` to install a specific crate version requirement.
-    #[builder(setter(into, strip_option), default)]
     version: Option<OsString>,
     /// Sets `--git` to install from a git repository.
-    #[builder(setter(into, strip_option), default)]
     git: Option<OsString>,
     /// Sets `--branch` when installing from git.
-    #[builder(setter(into, strip_option), default)]
     branch: Option<OsString>,
     /// Sets `--tag` when installing from git.
-    #[builder(setter(into, strip_option), default)]
     tag: Option<OsString>,
     /// Sets `--rev` when installing from git.
-    #[builder(setter(into, strip_option), default)]
     rev: Option<OsString>,
     /// Sets `--target` to build for a specific compilation target.
-    #[builder(setter(into, strip_option), default)]
     target: Option<OsString>,
     /// Sets `--path` to install from a local crate directory.
-    #[builder(setter(into, strip_option), default)]
     path: Option<std::path::PathBuf>,
     /// Sets the registry crate name to install.
-    #[builder(setter(into, strip_option), default)]
     crate_name: Option<OsString>,
     /// Enables `--force`.
     force: bool,
@@ -82,7 +73,6 @@ pub struct CargoInstall {
     /// Overrides the child process stdout configuration.
     ///
     /// When not set, stdout inherits from the current process.
-    #[builder(setter(strip_option), default)]
     stdout: Option<Stdio>,
 }
 
