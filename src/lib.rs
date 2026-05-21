@@ -10,9 +10,9 @@
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     CargoInstallBuilder::default()
+//!         .crate_name(Some("ripgrep".into()))
 //!         .version(Some("14.1.1".into()))
 //!         .locked(true)
-//!         .extra_args(vec!["ripgrep".into()])
 //!         .build()?
 //!         .run()?;
 //!
@@ -54,6 +54,8 @@ pub struct CargoInstall {
     target: Option<OsString>,
     /// Sets `--path` to install from a local crate directory.
     path: Option<std::path::PathBuf>,
+    /// Sets the registry crate name to install.
+    crate_name: Option<OsString>,
     /// Enables `--force`.
     force: bool,
     /// Enables `--locked`.
@@ -83,7 +85,7 @@ impl CargoInstall {
     /// Builds the `cargo install` argument vector in canonical flag order.
     ///
     /// The returned list always starts with `install`, followed by typed
-    /// options and flags, followed by `extra_args`.
+    /// options and flags, then `crate_name`, followed by `extra_args`.
     pub fn args(&self) -> Vec<OsString> {
         vec![OsString::from("install")].tap_mut(|args| {
             push_option(args, "--root", self.root.as_deref());
@@ -100,6 +102,9 @@ impl CargoInstall {
             push_joined(args, "--features", &self.features, ",");
             push_flag(args, "--all-features", self.all_features);
             push_flag(args, "--no-default-features", self.no_default_features);
+            if let Some(crate_name) = self.crate_name.as_ref() {
+                args.push(crate_name.clone());
+            }
             args.extend(self.extra_args.iter().cloned());
         })
     }

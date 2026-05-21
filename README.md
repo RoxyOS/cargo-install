@@ -9,9 +9,9 @@ use cargo_install::CargoInstallBuilder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     CargoInstallBuilder::default()
+        .crate_name(Some("ripgrep".into()))
         .version(Some("14.1.1".into()))
         .locked(true)
-        .extra_args(vec!["ripgrep".into()])
         .build()?
         .run()?;
 

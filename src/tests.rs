@@ -23,9 +23,9 @@ fn empty_builder_produces_cargo_install() {
 #[test]
 fn derived_builder_constructs_install() {
     let install = CargoInstallBuilder::default()
+        .crate_name(Some("ripgrep".into()))
         .version(Some("1.2.3".into()))
         .force(true)
-        .extra_args(vec!["ripgrep".into()])
         .build()
         .unwrap();
 
@@ -101,8 +101,9 @@ fn typed_flags_render_in_canonical_order() {
 #[test]
 fn raw_args_are_appended_after_typed_options() {
     let install = CargoInstallBuilder::default()
+        .crate_name(Some("ripgrep".into()))
         .version(Some("1.0.0".into()))
-        .extra_args(vec!["ripgrep".into(), "--force".into(), "--quiet".into()])
+        .extra_args(vec!["--force".into(), "--quiet".into()])
         .build()
         .unwrap();
 
