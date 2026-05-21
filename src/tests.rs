@@ -53,6 +53,7 @@ fn typed_flags_render_in_canonical_order() {
         .branch(Some("stable".into()))
         .tag(Some("v1.2.3".into()))
         .rev(Some("abc123".into()))
+        .target(Some("x86_64-unknown-linux-gnu".into()))
         .path(Some("vendor/pkg".into()))
         .force(true)
         .locked(true)
@@ -82,6 +83,8 @@ fn typed_flags_render_in_canonical_order() {
             OsStr::new("v1.2.3"),
             OsStr::new("--rev"),
             OsStr::new("abc123"),
+            OsStr::new("--target"),
+            OsStr::new("x86_64-unknown-linux-gnu"),
             OsStr::new("--path"),
             OsStr::new("vendor/pkg"),
             OsStr::new("--force"),

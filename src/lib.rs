@@ -18,6 +18,7 @@ pub struct CargoInstall {
     branch: Option<OsString>,
     tag: Option<OsString>,
     rev: Option<OsString>,
+    target: Option<OsString>,
     path: Option<std::path::PathBuf>,
     force: bool,
     locked: bool,
@@ -42,6 +43,7 @@ impl CargoInstall {
             push_option(args, "--branch", self.branch.as_deref());
             push_option(args, "--tag", self.tag.as_deref());
             push_option(args, "--rev", self.rev.as_deref());
+            push_option(args, "--target", self.target.as_deref());
             push_option(args, "--path", self.path.as_deref());
             push_flag(args, "--force", self.force);
             push_flag(args, "--locked", self.locked);
